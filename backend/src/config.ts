@@ -73,6 +73,8 @@ export const config: Config = {
     'http://localhost:3000',
     'http://localhost:3001',
     'http://localhost:5173',
+    'https://edu-analyst-ai.vercel.app',
+    'https://edu-analyst-ai-api.vercel.app',
   ]),
 
   // Rate Limiting
@@ -97,7 +99,10 @@ export function validateConfig(): void {
   if (errors.length > 0) {
     console.error('Configuration errors:');
     errors.forEach(err => console.error(`  - ${err}`));
-    process.exit(1);
+    // Don't exit in serverless environment
+    if (process.env.VERCEL !== '1') {
+      process.exit(1);
+    }
   }
 }
 
