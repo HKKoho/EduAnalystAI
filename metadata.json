@@ -1,0 +1,8 @@
+{
+  "name": "Edu-Analyst AI",
+  "description": "A professional academic analyzer that extracts educational insights from YouTube videos and long transcripts using Gemini 3 Flash.",
+  "requestFramePermissions": [
+    "camera",
+    "microphone"
+  ]
+}
