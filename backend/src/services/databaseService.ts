@@ -3,7 +3,7 @@
  * Handles all database operations using Prisma
  */
 
-import { PrismaClient, InputType, SourceType, Analysis } from '@prisma/client';
+import { PrismaClient, InputType, SourceType } from '@prisma/client';
 
 // Singleton Prisma client
 let prisma: PrismaClient | null = null;

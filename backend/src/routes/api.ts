@@ -10,7 +10,6 @@ import { config } from '../config.js';
 import {
   AnalyzeRequestSchema,
   AnalysisResult,
-  HistoryItem,
   isYouTubeUrl,
   extractVideoId,
   successResponse,
@@ -207,7 +206,7 @@ router.get('/history', async (req: Request, res: Response) => {
     const analyses = await db.getHistory(limit, offset);
     const total = await db.getAnalysisCount();
 
-    res.json({
+    return res.json({
       analyses: analyses.map(a => ({
         analysis_id: a.id,
         title: a.title,
@@ -221,7 +220,7 @@ router.get('/history', async (req: Request, res: Response) => {
     });
   } catch (error) {
     console.error('History fetch error:', error);
-    res.status(500).json(errorResponse('Failed to fetch history'));
+    return res.status(500).json(errorResponse('Failed to fetch history'));
   }
 });
 
@@ -240,28 +239,32 @@ router.get('/analysis/:id', async (req: Request, res: Response) => {
       );
     }
 
-    return res.json(successResponse({
-      title: analysis.title,
-      author: analysis.author,
-      markdown: analysis.markdown,
-      timestamp: analysis.createdAt.getTime(),
-      url: analysis.sourceUrl || '',
-      analysis_id: analysis.id,
-      // Include source content for full record
-      source: {
-        text: analysis.sourceText,
-        type: analysis.sourceType,
-        fileName: analysis.fileName,
-        videoId: analysis.videoId,
-        wordCount: analysis.wordCount,
-        language: analysis.language,
-        fileSize: analysis.fileSize,
-        mimeType: analysis.mimeType,
+    return res.json({
+      status: 'success',
+      result: {
+        title: analysis.title,
+        author: analysis.author,
+        markdown: analysis.markdown,
+        timestamp: analysis.createdAt.getTime(),
+        url: analysis.sourceUrl || '',
+        analysis_id: analysis.id,
+        // Include source content for full record
+        source: {
+          text: analysis.sourceText,
+          type: analysis.sourceType,
+          fileName: analysis.fileName,
+          videoId: analysis.videoId,
+          wordCount: analysis.wordCount,
+          language: analysis.language,
+          fileSize: analysis.fileSize,
+          mimeType: analysis.mimeType,
+        },
       },
-    }));
+      error: null,
+    });
   } catch (error) {
     console.error('Analysis fetch error:', error);
-    res.status(500).json(errorResponse('Failed to fetch analysis'));
+    return res.status(500).json(errorResponse('Failed to fetch analysis'));
   }
 });
 
@@ -286,7 +289,7 @@ router.delete('/history/:id', async (req: Request, res: Response) => {
     });
   } catch (error) {
     console.error('Delete error:', error);
-    res.status(500).json(errorResponse('Failed to delete analysis'));
+    return res.status(500).json(errorResponse('Failed to delete analysis'));
   }
 });
 

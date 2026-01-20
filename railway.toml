@@ -6,3 +6,6 @@ buildCommand = "cd backend && npm install && npx prisma generate && npm run buil
 startCommand = "cd backend && npx prisma migrate deploy && npm start"
 healthcheckPath = "/api/health"
 restartPolicyType = "on_failure"
+
+[nixpacks]
+nixPkgs = ["nodejs_20"]
