@@ -4,7 +4,7 @@
     "builder": "NIXPACKS"
   },
   "deploy": {
-    "startCommand": "npm run build && npm start",
+    "startCommand": "npx prisma migrate deploy && npm run build && npm start",
     "healthcheckPath": "/api/health",
     "restartPolicyType": "ON_FAILURE"
   }

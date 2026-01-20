@@ -10,6 +10,7 @@ import rateLimit from 'express-rate-limit';
 
 import { config, validateConfig } from './config.js';
 import apiRouter from './routes/api.js';
+import { disconnectDatabase } from './services/databaseService.js';
 
 // Validate configuration on startup
 validateConfig();
@@ -123,16 +124,18 @@ const server = app.listen(config.port, () => {
 });
 
 // Graceful shutdown
-process.on('SIGTERM', () => {
+process.on('SIGTERM', async () => {
   console.log('SIGTERM received. Shutting down gracefully...');
+  await disconnectDatabase();
   server.close(() => {
     console.log('Server closed');
     process.exit(0);
   });
 });
 
-process.on('SIGINT', () => {
+process.on('SIGINT', async () => {
   console.log('SIGINT received. Shutting down gracefully...');
+  await disconnectDatabase();
   server.close(() => {
     console.log('Server closed');
     process.exit(0);

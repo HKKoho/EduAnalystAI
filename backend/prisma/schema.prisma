@@ -1,0 +1,63 @@
+// Prisma schema for Edu-Analyst AI
+// Stores analysis history with source content and reports
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// Main analysis record
+model Analysis {
+  id          String   @id @default(cuid())
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Analysis metadata
+  title       String
+  author      String   @default("Edu-Analyst AI")
+  inputType   InputType
+  language    String?  // 'en' or 'zh-TW'
+  wordCount   Int?     // Target word count for the analysis
+
+  // Source content
+  sourceUrl   String?  // YouTube URL if applicable
+  videoId     String?  // YouTube video ID if applicable
+  sourceText  String   @db.Text // Original transcript/document/text content
+  sourceType  SourceType
+  fileName    String?  // Original filename for documents/images/audio
+
+  // Generated report
+  markdown    String   @db.Text // The generated analysis/summary
+
+  // File metadata (for non-text sources)
+  fileSize    Int?     // File size in bytes
+  mimeType    String?  // MIME type of uploaded file
+
+  @@index([createdAt(sort: Desc)])
+  @@index([inputType])
+  @@index([sourceType])
+}
+
+// Type of input provided by user
+enum InputType {
+  url      // YouTube URL
+  text     // Direct text/transcript
+  document // PDF, DOCX, TXT
+  image    // PNG, JPG, etc.
+  audio    // MP3, WAV, etc.
+}
+
+// Type of source content
+enum SourceType {
+  youtube_transcript
+  direct_text
+  pdf_document
+  docx_document
+  txt_document
+  image_file
+  audio_file
+}

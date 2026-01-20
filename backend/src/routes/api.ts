@@ -4,7 +4,6 @@
  */
 
 import { Router, Request, Response } from 'express';
-import { randomUUID } from 'crypto';
 import multer from 'multer';
 
 import { config } from '../config.js';
@@ -39,6 +38,11 @@ import {
   AudioServiceError,
   SUPPORTED_AUDIO_TYPES,
 } from '../services/audioService.js';
+import {
+  getDatabaseService,
+  InputType,
+  SourceType,
+} from '../services/databaseService.js';
 
 // Configure multer for file uploads (memory storage)
 const upload = multer({
@@ -53,14 +57,8 @@ const VALID_WORD_COUNTS = [150, 250, 300, 500, 1000];
 
 const router = Router();
 
-// In-memory storage (replace with database in production)
-const analysisHistory: HistoryItem[] = [];
-const analysisResults: Map<string, AnalysisResult> = new Map();
-
-// Generate short unique ID
-function generateId(): string {
-  return randomUUID().slice(0, 8);
-}
+// Get database service instance
+const db = getDatabaseService();
 
 /**
  * GET /api/health
@@ -81,7 +79,6 @@ router.get('/health', (_req: Request, res: Response) => {
  */
 router.post('/analyze', async (req: Request, res: Response) => {
   const startTime = Date.now();
-  const analysisId = generateId();
 
   try {
     // Validate request
@@ -150,38 +147,31 @@ router.post('/analyze', async (req: Request, res: Response) => {
       language
     );
 
-    // Build result
+    // Save to database
+    const savedAnalysis = await db.createAnalysis({
+      title,
+      inputType: isUrl ? InputType.url : InputType.text,
+      language: language,
+      wordCount: validWordCount,
+      sourceUrl: isUrl ? input : undefined,
+      videoId: videoId || undefined,
+      sourceText: cleanedTranscript,
+      sourceType: isUrl ? SourceType.youtube_transcript : SourceType.direct_text,
+      markdown: markdownResult,
+    });
+
+    // Build result for response
     const result: AnalysisResult = {
       title,
       author: 'Edu-Analyst AI',
       markdown: markdownResult,
-      timestamp: Date.now(),
+      timestamp: savedAnalysis.createdAt.getTime(),
       url: isUrl ? input : '',
-      analysis_id: analysisId,
+      analysis_id: savedAnalysis.id,
     };
-
-    // Store in history
-    const historyItem: HistoryItem = {
-      analysis_id: analysisId,
-      title,
-      timestamp: result.timestamp,
-      input_type: isUrl ? 'url' : 'text',
-      url: result.url,
-    };
-
-    analysisHistory.unshift(historyItem);
-    analysisResults.set(analysisId, result);
-
-    // Keep only last 50 items
-    if (analysisHistory.length > 50) {
-      const removed = analysisHistory.pop();
-      if (removed) {
-        analysisResults.delete(removed.analysis_id);
-      }
-    }
 
     const elapsed = (Date.now() - startTime) / 1000;
-    console.log(`Analysis completed in ${elapsed.toFixed(2)}s, ID: ${analysisId}`);
+    console.log(`Analysis completed in ${elapsed.toFixed(2)}s, ID: ${savedAnalysis.id}`);
 
     return res.json(successResponse(result));
 
@@ -206,60 +196,98 @@ router.post('/analyze', async (req: Request, res: Response) => {
  * GET /api/history
  * Get recent analysis history
  */
-router.get('/history', (req: Request, res: Response) => {
-  const limit = Math.min(
-    parseInt(req.query.limit as string) || 10,
-    50
-  );
+router.get('/history', async (req: Request, res: Response) => {
+  try {
+    const limit = Math.min(
+      parseInt(req.query.limit as string) || 10,
+      50
+    );
+    const offset = parseInt(req.query.offset as string) || 0;
 
-  res.json({
-    analyses: analysisHistory.slice(0, limit),
-  });
+    const analyses = await db.getHistory(limit, offset);
+    const total = await db.getAnalysisCount();
+
+    res.json({
+      analyses: analyses.map(a => ({
+        analysis_id: a.id,
+        title: a.title,
+        timestamp: a.createdAt.getTime(),
+        input_type: a.inputType,
+        url: a.sourceUrl || '',
+      })),
+      total,
+      limit,
+      offset,
+    });
+  } catch (error) {
+    console.error('History fetch error:', error);
+    res.status(500).json(errorResponse('Failed to fetch history'));
+  }
 });
 
 /**
  * GET /api/analysis/:id
- * Retrieve a specific analysis by ID
+ * Retrieve a specific analysis by ID (includes source content)
  */
-router.get('/analysis/:id', (req: Request, res: Response) => {
-  const { id } = req.params;
-  const result = analysisResults.get(id);
+router.get('/analysis/:id', async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const analysis = await db.getAnalysis(id);
 
-  if (!result) {
-    return res.status(404).json(
-      errorResponse(`Analysis with ID '${id}' not found`)
-    );
+    if (!analysis) {
+      return res.status(404).json(
+        errorResponse(`Analysis with ID '${id}' not found`)
+      );
+    }
+
+    return res.json(successResponse({
+      title: analysis.title,
+      author: analysis.author,
+      markdown: analysis.markdown,
+      timestamp: analysis.createdAt.getTime(),
+      url: analysis.sourceUrl || '',
+      analysis_id: analysis.id,
+      // Include source content for full record
+      source: {
+        text: analysis.sourceText,
+        type: analysis.sourceType,
+        fileName: analysis.fileName,
+        videoId: analysis.videoId,
+        wordCount: analysis.wordCount,
+        language: analysis.language,
+        fileSize: analysis.fileSize,
+        mimeType: analysis.mimeType,
+      },
+    }));
+  } catch (error) {
+    console.error('Analysis fetch error:', error);
+    res.status(500).json(errorResponse('Failed to fetch analysis'));
   }
-
-  return res.json(successResponse(result));
 });
 
 /**
  * DELETE /api/history/:id
  * Delete an analysis from history
  */
-router.delete('/history/:id', (req: Request, res: Response) => {
-  const { id } = req.params;
+router.delete('/history/:id', async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const deleted = await db.deleteAnalysis(id);
 
-  if (!analysisResults.has(id)) {
-    return res.status(404).json(
-      errorResponse(`Analysis with ID '${id}' not found`)
-    );
+    if (!deleted) {
+      return res.status(404).json(
+        errorResponse(`Analysis with ID '${id}' not found`)
+      );
+    }
+
+    return res.json({
+      status: 'success',
+      message: `Analysis ${id} deleted`,
+    });
+  } catch (error) {
+    console.error('Delete error:', error);
+    res.status(500).json(errorResponse('Failed to delete analysis'));
   }
-
-  // Remove from results
-  analysisResults.delete(id);
-
-  // Remove from history
-  const index = analysisHistory.findIndex(h => h.analysis_id === id);
-  if (index !== -1) {
-    analysisHistory.splice(index, 1);
-  }
-
-  return res.json({
-    status: 'success',
-    message: `Analysis ${id} deleted`,
-  });
 });
 
 /**
@@ -293,8 +321,7 @@ router.post(
   upload.single('file'),
   async (req: Request, res: Response) => {
     const startTime = Date.now();
-    const analysisId = generateId();
-
+    
     try {
       // Check if file was uploaded
       if (!req.file) {
@@ -350,38 +377,43 @@ router.post(
         language
       );
 
-      // Build result
+      // Determine source type based on file extension
+      const fileExt = parsedDoc.fileName.toLowerCase().split('.').pop();
+      let sourceType: SourceType;
+      if (fileExt === 'pdf') {
+        sourceType = SourceType.pdf_document;
+      } else if (fileExt === 'docx') {
+        sourceType = SourceType.docx_document;
+      } else {
+        sourceType = SourceType.txt_document;
+      }
+
+      // Save to database
+      const savedAnalysis = await db.createAnalysis({
+        title: `Document Summary: ${parsedDoc.fileName}`,
+        inputType: InputType.document,
+        language: language,
+        wordCount: wordCount,
+        sourceText: parsedDoc.text,
+        sourceType: sourceType,
+        fileName: parsedDoc.fileName,
+        markdown: summary,
+        fileSize: req.file.size,
+        mimeType: req.file.mimetype,
+      });
+
+      // Build result for response
       const result: AnalysisResult = {
         title: `Document Summary: ${parsedDoc.fileName}`,
         author: 'Edu-Analyst AI',
         markdown: summary,
-        timestamp: Date.now(),
+        timestamp: savedAnalysis.createdAt.getTime(),
         url: '',
-        analysis_id: analysisId,
+        analysis_id: savedAnalysis.id,
       };
-
-      // Store in history
-      const historyItem: HistoryItem = {
-        analysis_id: analysisId,
-        title: result.title,
-        timestamp: result.timestamp,
-        input_type: 'text',
-        url: '',
-      };
-
-      analysisHistory.unshift(historyItem);
-      analysisResults.set(analysisId, result);
-
-      // Keep only last 50 items
-      if (analysisHistory.length > 50) {
-        const removed = analysisHistory.pop();
-        if (removed) {
-          analysisResults.delete(removed.analysis_id);
-        }
-      }
 
       const elapsed = (Date.now() - startTime) / 1000;
-      console.log(`Document summarization completed in ${elapsed.toFixed(2)}s, ID: ${analysisId}`);
+      console.log(`Document summarization completed in ${elapsed.toFixed(2)}s, ID: ${savedAnalysis.id}`);
 
       return res.json(successResponse(result));
     } catch (error) {
@@ -411,8 +443,7 @@ router.post(
   upload.single('file'),
   async (req: Request, res: Response) => {
     const startTime = Date.now();
-    const analysisId = generateId();
-
+    
     try {
       // Check if file was uploaded
       if (!req.file) {
@@ -456,38 +487,32 @@ router.post(
         language
       );
 
-      // Build result
+      // Save to database (store base64 of image as source)
+      const savedAnalysis = await db.createAnalysis({
+        title: `Image Analysis: ${analysisResult.fileName}`,
+        inputType: InputType.image,
+        language: language,
+        wordCount: wordCount,
+        sourceText: `[Image file: ${analysisResult.fileName}]`, // Description instead of actual data
+        sourceType: SourceType.image_file,
+        fileName: analysisResult.fileName,
+        markdown: analysisResult.analysis,
+        fileSize: req.file.size,
+        mimeType: req.file.mimetype,
+      });
+
+      // Build result for response
       const result: AnalysisResult = {
         title: `Image Analysis: ${analysisResult.fileName}`,
         author: 'Edu-Analyst AI',
         markdown: analysisResult.analysis,
-        timestamp: Date.now(),
+        timestamp: savedAnalysis.createdAt.getTime(),
         url: '',
-        analysis_id: analysisId,
+        analysis_id: savedAnalysis.id,
       };
-
-      // Store in history
-      const historyItem: HistoryItem = {
-        analysis_id: analysisId,
-        title: result.title,
-        timestamp: result.timestamp,
-        input_type: 'text',
-        url: '',
-      };
-
-      analysisHistory.unshift(historyItem);
-      analysisResults.set(analysisId, result);
-
-      // Keep only last 50 items
-      if (analysisHistory.length > 50) {
-        const removed = analysisHistory.pop();
-        if (removed) {
-          analysisResults.delete(removed.analysis_id);
-        }
-      }
 
       const elapsed = (Date.now() - startTime) / 1000;
-      console.log(`Image analysis completed in ${elapsed.toFixed(2)}s, ID: ${analysisId}`);
+      console.log(`Image analysis completed in ${elapsed.toFixed(2)}s, ID: ${savedAnalysis.id}`);
 
       return res.json(successResponse(result));
     } catch (error) {
@@ -513,8 +538,7 @@ router.post(
   upload.single('file'),
   async (req: Request, res: Response) => {
     const startTime = Date.now();
-    const analysisId = generateId();
-
+    
     try {
       // Check if file was uploaded
       if (!req.file) {
@@ -562,38 +586,32 @@ router.post(
         language
       );
 
-      // Build result
+      // Save to database
+      const savedAnalysis = await db.createAnalysis({
+        title: `Audio Analysis: ${analysisResult.fileName}`,
+        inputType: InputType.audio,
+        language: language,
+        wordCount: wordCount,
+        sourceText: `[Audio file: ${analysisResult.fileName}]`, // Description instead of actual data
+        sourceType: SourceType.audio_file,
+        fileName: analysisResult.fileName,
+        markdown: analysisResult.analysis,
+        fileSize: req.file.size,
+        mimeType: req.file.mimetype,
+      });
+
+      // Build result for response
       const result: AnalysisResult = {
         title: `Audio Analysis: ${analysisResult.fileName}`,
         author: 'Edu-Analyst AI',
         markdown: analysisResult.analysis,
-        timestamp: Date.now(),
+        timestamp: savedAnalysis.createdAt.getTime(),
         url: '',
-        analysis_id: analysisId,
+        analysis_id: savedAnalysis.id,
       };
-
-      // Store in history
-      const historyItem: HistoryItem = {
-        analysis_id: analysisId,
-        title: result.title,
-        timestamp: result.timestamp,
-        input_type: 'text',
-        url: '',
-      };
-
-      analysisHistory.unshift(historyItem);
-      analysisResults.set(analysisId, result);
-
-      // Keep only last 50 items
-      if (analysisHistory.length > 50) {
-        const removed = analysisHistory.pop();
-        if (removed) {
-          analysisResults.delete(removed.analysis_id);
-        }
-      }
 
       const elapsed = (Date.now() - startTime) / 1000;
-      console.log(`Audio analysis completed in ${elapsed.toFixed(2)}s, ID: ${analysisId}`);
+      console.log(`Audio analysis completed in ${elapsed.toFixed(2)}s, ID: ${savedAnalysis.id}`);
 
       return res.json(successResponse(result));
     } catch (error) {
