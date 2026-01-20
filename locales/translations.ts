@@ -3,12 +3,12 @@ export type Language = 'en' | 'zh-TW';
 export const translations = {
   en: {
     // Header
-    appName: 'Edu-Analyst',
-    appSubtitle: 'AI',
+    appName: 'Scholarly Content Analysis',
+    appSubtitle: '',
     viewHistory: 'View History',
 
     // Main section
-    mainTitle: 'Scholarly Video Analysis',
+    mainTitle: 'Video Analysis',
     mainSubtitle: 'Paste a YouTube URL or transcript below to receive a high-level educational synthesis, curated by advanced semantic models.',
     inputPlaceholder: 'Paste YouTube URL or long transcript text here...',
     analyzeButton: 'Analyze',
@@ -70,12 +70,12 @@ export const translations = {
   },
   'zh-TW': {
     // Header
-    appName: '教育分析師',
-    appSubtitle: 'AI',
+    appName: '學術內容分析',
+    appSubtitle: '',
     viewHistory: '查看歷史記錄',
 
     // Main section
-    mainTitle: '學術影片分析',
+    mainTitle: '影片分析',
     mainSubtitle: '在下方貼上 YouTube 網址或文字稿，即可獲得由先進語義模型精選的高階教育綜合分析。',
     inputPlaceholder: '在此貼上 YouTube 網址或長文字稿...',
     analyzeButton: '分析',

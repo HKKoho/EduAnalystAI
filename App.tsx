@@ -34,6 +34,9 @@ const App: React.FC = () => {
   const [transcriptText, setTranscriptText] = useState('');
   const [transcriptWordCount, setTranscriptWordCount] = useState<WordCountOption>(300);
 
+  // URL analysis word count
+  const [urlWordCount, setUrlWordCount] = useState<WordCountOption>(300);
+
   // Get translations for current language
   const t = translations[language];
 
@@ -85,7 +88,7 @@ const App: React.FC = () => {
         inputValue,
         isUrl,
         (status) => setState(prev => ({ ...prev, status })),
-        undefined,
+        urlWordCount,
         language as ApiLanguage
       );
 
@@ -370,17 +373,30 @@ const App: React.FC = () => {
             <input
               type="text"
               placeholder={t.inputPlaceholder}
-              className="w-full pl-14 pr-32 py-5 bg-white dark:bg-slate-900 border-2 border-slate-200 dark:border-slate-800 rounded-2xl shadow-sm focus:ring-4 focus:ring-slate-900/5 focus:border-slate-900 dark:focus:border-slate-500 outline-none transition-all text-lg"
+              className="w-full pl-14 pr-56 py-5 bg-white dark:bg-slate-900 border-2 border-slate-200 dark:border-slate-800 rounded-2xl shadow-sm focus:ring-4 focus:ring-slate-900/5 focus:border-slate-900 dark:focus:border-slate-500 outline-none transition-all text-lg"
               value={inputValue}
               onChange={(e) => setInputValue(e.target.value)}
             />
-            <button
-              type="submit"
-              disabled={isProcessing}
-              className="absolute right-3 inset-y-3 px-6 bg-slate-900 dark:bg-white text-white dark:text-slate-900 font-bold rounded-xl hover:opacity-90 active:scale-95 transition-all disabled:opacity-50 flex items-center gap-2"
-            >
-              {t.analyzeButton} <ChevronRight className="w-4 h-4" />
-            </button>
+            <div className="absolute right-3 inset-y-3 flex items-center gap-2">
+              <select
+                value={urlWordCount}
+                onChange={(e) => setUrlWordCount(Number(e.target.value) as WordCountOption)}
+                className="px-2 py-2 bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-slate-500"
+              >
+                {WORD_COUNT_OPTIONS.map((count) => (
+                  <option key={count} value={count}>
+                    {count} {t.words}
+                  </option>
+                ))}
+              </select>
+              <button
+                type="submit"
+                disabled={isProcessing}
+                className="px-6 py-2 bg-slate-900 dark:bg-white text-white dark:text-slate-900 font-bold rounded-xl hover:opacity-90 active:scale-95 transition-all disabled:opacity-50 flex items-center gap-2"
+              >
+                {t.analyzeButton} <ChevronRight className="w-4 h-4" />
+              </button>
+            </div>
           </form>
 
           {/* File Upload Section */}
