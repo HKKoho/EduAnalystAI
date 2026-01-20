@@ -146,7 +146,7 @@ router.post('/analyze', async (req: Request, res: Response) => {
       language
     );
 
-    // Save to database
+    // Save to database (if configured)
     const savedAnalysis = await db.createAnalysis({
       title,
       inputType: isUrl ? InputType.url : InputType.text,
@@ -164,13 +164,13 @@ router.post('/analyze', async (req: Request, res: Response) => {
       title,
       author: 'Edu-Analyst AI',
       markdown: markdownResult,
-      timestamp: savedAnalysis.createdAt.getTime(),
+      timestamp: savedAnalysis?.createdAt.getTime() || Date.now(),
       url: isUrl ? input : '',
-      analysis_id: savedAnalysis.id,
+      analysis_id: savedAnalysis?.id || `temp-${Date.now()}`,
     };
 
     const elapsed = (Date.now() - startTime) / 1000;
-    console.log(`Analysis completed in ${elapsed.toFixed(2)}s, ID: ${savedAnalysis.id}`);
+    console.log(`Analysis completed in ${elapsed.toFixed(2)}s${savedAnalysis ? `, ID: ${savedAnalysis.id}` : ' (not persisted)'}`);
 
     return res.json(successResponse(result));
 
@@ -410,13 +410,13 @@ router.post(
         title: `Document Summary: ${parsedDoc.fileName}`,
         author: 'Edu-Analyst AI',
         markdown: summary,
-        timestamp: savedAnalysis.createdAt.getTime(),
+        timestamp: savedAnalysis?.createdAt.getTime() || Date.now(),
         url: '',
-        analysis_id: savedAnalysis.id,
+        analysis_id: savedAnalysis?.id || `temp-${Date.now()}`,
       };
 
       const elapsed = (Date.now() - startTime) / 1000;
-      console.log(`Document summarization completed in ${elapsed.toFixed(2)}s, ID: ${savedAnalysis.id}`);
+      console.log(`Document summarization completed in ${elapsed.toFixed(2)}s${savedAnalysis ? `, ID: ${savedAnalysis.id}` : ' (not persisted)'}`);
 
       return res.json(successResponse(result));
     } catch (error) {
@@ -509,13 +509,13 @@ router.post(
         title: `Image Analysis: ${analysisResult.fileName}`,
         author: 'Edu-Analyst AI',
         markdown: analysisResult.analysis,
-        timestamp: savedAnalysis.createdAt.getTime(),
+        timestamp: savedAnalysis?.createdAt.getTime() || Date.now(),
         url: '',
-        analysis_id: savedAnalysis.id,
+        analysis_id: savedAnalysis?.id || `temp-${Date.now()}`,
       };
 
       const elapsed = (Date.now() - startTime) / 1000;
-      console.log(`Image analysis completed in ${elapsed.toFixed(2)}s, ID: ${savedAnalysis.id}`);
+      console.log(`Image analysis completed in ${elapsed.toFixed(2)}s${savedAnalysis ? `, ID: ${savedAnalysis.id}` : ' (not persisted)'}`);
 
       return res.json(successResponse(result));
     } catch (error) {
@@ -608,13 +608,13 @@ router.post(
         title: `Audio Analysis: ${analysisResult.fileName}`,
         author: 'Edu-Analyst AI',
         markdown: analysisResult.analysis,
-        timestamp: savedAnalysis.createdAt.getTime(),
+        timestamp: savedAnalysis?.createdAt.getTime() || Date.now(),
         url: '',
-        analysis_id: savedAnalysis.id,
+        analysis_id: savedAnalysis?.id || `temp-${Date.now()}`,
       };
 
       const elapsed = (Date.now() - startTime) / 1000;
-      console.log(`Audio analysis completed in ${elapsed.toFixed(2)}s, ID: ${savedAnalysis.id}`);
+      console.log(`Audio analysis completed in ${elapsed.toFixed(2)}s${savedAnalysis ? `, ID: ${savedAnalysis.id}` : ' (not persisted)'}`);
 
       return res.json(successResponse(result));
     } catch (error) {

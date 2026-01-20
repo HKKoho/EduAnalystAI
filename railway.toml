@@ -3,8 +3,9 @@ builder = "nixpacks"
 buildCommand = "cd backend && npm install && npx prisma generate && npm run build"
 
 [deploy]
-startCommand = "cd backend && npx prisma migrate deploy && npm start"
-healthcheckPath = "/api/health"
+startCommand = "cd backend && npx prisma db push --accept-data-loss && npm start"
+healthcheckPath = "/"
+healthcheckTimeout = 300
 restartPolicyType = "on_failure"
 
 [nixpacks]

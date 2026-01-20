@@ -5,10 +5,19 @@
 
 import { PrismaClient, InputType, SourceType } from '@prisma/client';
 
+// Check if database is configured
+export function isDatabaseConfigured(): boolean {
+  return !!process.env.DATABASE_URL;
+}
+
 // Singleton Prisma client
 let prisma: PrismaClient | null = null;
 
-export function getPrismaClient(): PrismaClient {
+export function getPrismaClient(): PrismaClient | null {
+  if (!isDatabaseConfigured()) {
+    console.warn('DATABASE_URL not configured - database features disabled');
+    return null;
+  }
   if (!prisma) {
     prisma = new PrismaClient({
       log: process.env.NODE_ENV === 'development' ? ['query', 'error', 'warn'] : ['error'],
@@ -73,16 +82,27 @@ export interface HistoryItem {
  * Database Service class
  */
 export class DatabaseService {
-  private prisma: PrismaClient;
+  private prisma: PrismaClient | null;
+  private enabled: boolean;
 
   constructor() {
     this.prisma = getPrismaClient();
+    this.enabled = this.prisma !== null;
+    if (!this.enabled) {
+      console.warn('DatabaseService: Running without database persistence');
+    }
+  }
+
+  isEnabled(): boolean {
+    return this.enabled;
   }
 
   /**
    * Create a new analysis record
    */
-  async createAnalysis(input: CreateAnalysisInput): Promise<AnalysisRecord> {
+  async createAnalysis(input: CreateAnalysisInput): Promise<AnalysisRecord | null> {
+    if (!this.prisma) return null;
+
     const analysis = await this.prisma.analysis.create({
       data: {
         title: input.title,
@@ -108,6 +128,7 @@ export class DatabaseService {
    * Get an analysis by ID
    */
   async getAnalysis(id: string): Promise<AnalysisRecord | null> {
+    if (!this.prisma) return null;
     return this.prisma.analysis.findUnique({
       where: { id },
     });
@@ -117,6 +138,7 @@ export class DatabaseService {
    * Get analysis history (paginated)
    */
   async getHistory(limit: number = 50, offset: number = 0): Promise<HistoryItem[]> {
+    if (!this.prisma) return [];
     const analyses = await this.prisma.analysis.findMany({
       select: {
         id: true,
@@ -138,6 +160,7 @@ export class DatabaseService {
    * Get total count of analyses
    */
   async getAnalysisCount(): Promise<number> {
+    if (!this.prisma) return 0;
     return this.prisma.analysis.count();
   }
 
@@ -145,6 +168,7 @@ export class DatabaseService {
    * Delete an analysis by ID
    */
   async deleteAnalysis(id: string): Promise<boolean> {
+    if (!this.prisma) return false;
     try {
       await this.prisma.analysis.delete({
         where: { id },
@@ -159,6 +183,7 @@ export class DatabaseService {
    * Search analyses by title or content
    */
   async searchAnalyses(query: string, limit: number = 20): Promise<HistoryItem[]> {
+    if (!this.prisma) return [];
     const analyses = await this.prisma.analysis.findMany({
       where: {
         OR: [
@@ -186,6 +211,7 @@ export class DatabaseService {
    * Get analyses by type
    */
   async getAnalysesByType(inputType: InputType, limit: number = 50): Promise<HistoryItem[]> {
+    if (!this.prisma) return [];
     const analyses = await this.prisma.analysis.findMany({
       where: { inputType },
       select: {
@@ -207,6 +233,7 @@ export class DatabaseService {
    * Clear all analyses (use with caution)
    */
   async clearAllAnalyses(): Promise<number> {
+    if (!this.prisma) return 0;
     const result = await this.prisma.analysis.deleteMany();
     return result.count;
   }
