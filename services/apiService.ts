@@ -10,6 +10,8 @@
 import { AnalysisStatus, AnalysisResult } from "../types";
 
 // API Configuration
+// VITE_API_URL should point to Railway backend in production
+// In development, use localhost:8000
 const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:8000";
 
 // Language type
