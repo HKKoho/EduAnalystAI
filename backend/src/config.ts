@@ -23,6 +23,7 @@ export interface Config {
   port: number;
   nodeEnv: string;
   corsOrigins: string[];
+  frontendUrl: string;
 
   // Rate Limiting
   rateLimitRequests: number;
@@ -31,6 +32,19 @@ export interface Config {
   // Caching
   cacheEnabled: boolean;
   cacheTtl: number; // milliseconds
+
+  // JWT Configuration
+  jwtSecret: string;
+  jwtRefreshSecret: string;
+  jwtAccessExpiresIn: string;
+  jwtRefreshExpiresIn: string;
+
+  // SMTP Configuration
+  smtpHost: string;
+  smtpPort: number;
+  smtpUser: string;
+  smtpPassword: string;
+  smtpFrom: string;
 }
 
 function parseArray(value: string | undefined, defaultValue: string[]): string[] {
@@ -76,6 +90,7 @@ export const config: Config = {
     'https://edu-analyst-ai.vercel.app',
     'https://edu-analyst-ai-api.vercel.app',
   ]),
+  frontendUrl: process.env.FRONTEND_URL || 'http://localhost:5173',
 
   // Rate Limiting
   rateLimitRequests: parseNumber(process.env.RATE_LIMIT_REQUESTS, 10),
@@ -84,6 +99,19 @@ export const config: Config = {
   // Caching
   cacheEnabled: parseBoolean(process.env.CACHE_ENABLED, true),
   cacheTtl: parseNumber(process.env.CACHE_TTL, 3600) * 1000, // convert to ms
+
+  // JWT Configuration
+  jwtSecret: process.env.JWT_SECRET || 'dev-jwt-secret-change-in-production',
+  jwtRefreshSecret: process.env.JWT_REFRESH_SECRET || 'dev-jwt-refresh-secret-change-in-production',
+  jwtAccessExpiresIn: process.env.JWT_ACCESS_EXPIRES_IN || '15m',
+  jwtRefreshExpiresIn: process.env.JWT_REFRESH_EXPIRES_IN || '7d',
+
+  // SMTP Configuration
+  smtpHost: process.env.SMTP_HOST || '',
+  smtpPort: parseNumber(process.env.SMTP_PORT, 587),
+  smtpUser: process.env.SMTP_USER || '',
+  smtpPassword: process.env.SMTP_PASSWORD || '',
+  smtpFrom: process.env.SMTP_FROM || 'noreply@edu-analyst.ai',
 };
 
 /**

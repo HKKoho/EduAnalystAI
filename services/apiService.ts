@@ -8,11 +8,35 @@
  */
 
 import { AnalysisStatus, AnalysisResult } from "../types";
+import { getAccessToken, refreshAccessToken, clearAuthData } from "./authApi";
 
 // API Configuration
 // VITE_API_URL should point to Railway backend in production
 // In development, use localhost:8000
 const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:8000";
+
+/**
+ * Get auth headers for API requests
+ */
+function getAuthHeaders(): Record<string, string> {
+  const token = getAccessToken();
+  return token ? { Authorization: `Bearer ${token}` } : {};
+}
+
+/**
+ * Handle 401 errors by refreshing token and retrying
+ */
+async function handleUnauthorized<T>(
+  retryFn: () => Promise<T>
+): Promise<T | null> {
+  const newTokens = await refreshAccessToken();
+  if (newTokens) {
+    return retryFn();
+  }
+  clearAuthData();
+  window.location.href = "/login";
+  return null;
+}
 
 // Language type
 export type Language = "en" | "zh-TW";
@@ -126,9 +150,19 @@ export class ApiService {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
+          ...getAuthHeaders(),
         },
         body: JSON.stringify(requestBody),
       });
+
+      // Handle 401 - try to refresh token
+      if (response.status === 401) {
+        const result = await handleUnauthorized(() =>
+          this.analyze(input, isUrl, onStatusChange, wordCount, language)
+        );
+        if (result) return result;
+        throw new ApiError("Session expired. Please log in again.", 401);
+      }
 
       // Update status: analyzing content
       onStatusChange(AnalysisStatus.ANALYZING);
@@ -198,8 +232,14 @@ export class ApiService {
    */
   async getHistory(limit: number = 10): Promise<HistoryItem[]> {
     const response = await fetch(
-      `${this.baseUrl}/api/history?limit=${limit}`
+      `${this.baseUrl}/api/history?limit=${limit}`,
+      { headers: getAuthHeaders() }
     );
+
+    if (response.status === 401) {
+      const result = await handleUnauthorized(() => this.getHistory(limit));
+      return result || [];
+    }
 
     if (!response.ok) {
       throw new ApiError("Failed to fetch history", response.status);
@@ -217,8 +257,15 @@ export class ApiService {
    */
   async getAnalysis(analysisId: string): Promise<AnalysisResult> {
     const response = await fetch(
-      `${this.baseUrl}/api/analysis/${analysisId}`
+      `${this.baseUrl}/api/analysis/${analysisId}`,
+      { headers: getAuthHeaders() }
     );
+
+    if (response.status === 401) {
+      const result = await handleUnauthorized(() => this.getAnalysis(analysisId));
+      if (result) return result;
+      throw new ApiError("Session expired. Please log in again.", 401);
+    }
 
     if (response.status === 404) {
       throw new ApiError("Analysis not found", 404);
@@ -251,8 +298,16 @@ export class ApiService {
   async deleteAnalysis(analysisId: string): Promise<void> {
     const response = await fetch(
       `${this.baseUrl}/api/history/${analysisId}`,
-      { method: "DELETE" }
+      {
+        method: "DELETE",
+        headers: getAuthHeaders(),
+      }
     );
+
+    if (response.status === 401) {
+      await handleUnauthorized(() => this.deleteAnalysis(analysisId));
+      return;
+    }
 
     if (response.status === 404) {
       throw new ApiError("Analysis not found", 404);
@@ -305,8 +360,17 @@ export async function summarizeDocument(
   try {
     const response = await fetch(`${API_BASE_URL}/api/summarize-document`, {
       method: "POST",
+      headers: getAuthHeaders(),
       body: formData,
     });
+
+    if (response.status === 401) {
+      const result = await handleUnauthorized(() =>
+        summarizeDocument(file, wordCount, onStatusChange, language)
+      );
+      if (result) return result;
+      throw new ApiError("Session expired. Please log in again.", 401);
+    }
 
     onStatusChange(AnalysisStatus.ANALYZING);
 
@@ -379,8 +443,17 @@ export async function analyzeImage(
   try {
     const response = await fetch(`${API_BASE_URL}/api/analyze-image`, {
       method: "POST",
+      headers: getAuthHeaders(),
       body: formData,
     });
+
+    if (response.status === 401) {
+      const result = await handleUnauthorized(() =>
+        analyzeImage(file, wordCount, onStatusChange, language)
+      );
+      if (result) return result;
+      throw new ApiError("Session expired. Please log in again.", 401);
+    }
 
     onStatusChange(AnalysisStatus.ANALYZING);
 
@@ -453,8 +526,17 @@ export async function analyzeAudio(
   try {
     const response = await fetch(`${API_BASE_URL}/api/analyze-audio`, {
       method: "POST",
+      headers: getAuthHeaders(),
       body: formData,
     });
+
+    if (response.status === 401) {
+      const result = await handleUnauthorized(() =>
+        analyzeAudio(file, wordCount, onStatusChange, language)
+      );
+      if (result) return result;
+      throw new ApiError("Session expired. Please log in again.", 401);
+    }
 
     onStatusChange(AnalysisStatus.ANALYZING);
 

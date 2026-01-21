@@ -7,6 +7,7 @@ import { Router, Request, Response } from 'express';
 import multer from 'multer';
 
 import { config } from '../config.js';
+import { requireAuth } from '../middleware/auth.js';
 import {
   AnalyzeRequestSchema,
   AnalysisResult,
@@ -75,8 +76,9 @@ router.get('/health', (_req: Request, res: Response) => {
 /**
  * POST /api/analyze
  * Main analysis endpoint - implements Source-First architecture
+ * Requires authentication
  */
-router.post('/analyze', async (req: Request, res: Response) => {
+router.post('/analyze', requireAuth, async (req: Request, res: Response) => {
   const startTime = Date.now();
 
   try {
@@ -157,6 +159,7 @@ router.post('/analyze', async (req: Request, res: Response) => {
       sourceText: cleanedTranscript,
       sourceType: isUrl ? SourceType.youtube_transcript : SourceType.direct_text,
       markdown: markdownResult,
+      userId: req.user?.userId,
     });
 
     // Build result for response
@@ -193,18 +196,19 @@ router.post('/analyze', async (req: Request, res: Response) => {
 
 /**
  * GET /api/history
- * Get recent analysis history
+ * Get recent analysis history for the authenticated user
  */
-router.get('/history', async (req: Request, res: Response) => {
+router.get('/history', requireAuth, async (req: Request, res: Response) => {
   try {
     const limit = Math.min(
       parseInt(req.query.limit as string) || 10,
       50
     );
     const offset = parseInt(req.query.offset as string) || 0;
+    const userId = req.user!.userId;
 
-    const analyses = await db.getHistory(limit, offset);
-    const total = await db.getAnalysisCount();
+    const analyses = await db.getHistory(limit, offset, userId);
+    const total = await db.getAnalysisCount(userId);
 
     return res.json({
       analyses: analyses.map(a => ({
@@ -227,11 +231,13 @@ router.get('/history', async (req: Request, res: Response) => {
 /**
  * GET /api/analysis/:id
  * Retrieve a specific analysis by ID (includes source content)
+ * Requires authentication and verifies ownership
  */
-router.get('/analysis/:id', async (req: Request, res: Response) => {
+router.get('/analysis/:id', requireAuth, async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
-    const analysis = await db.getAnalysis(id);
+    const userId = req.user!.userId;
+    const analysis = await db.getAnalysis(id, userId);
 
     if (!analysis) {
       return res.status(404).json(
@@ -271,11 +277,13 @@ router.get('/analysis/:id', async (req: Request, res: Response) => {
 /**
  * DELETE /api/history/:id
  * Delete an analysis from history
+ * Requires authentication and verifies ownership
  */
-router.delete('/history/:id', async (req: Request, res: Response) => {
+router.delete('/history/:id', requireAuth, async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
-    const deleted = await db.deleteAnalysis(id);
+    const userId = req.user!.userId;
+    const deleted = await db.deleteAnalysis(id, userId);
 
     if (!deleted) {
       return res.status(404).json(
@@ -318,9 +326,11 @@ router.post('/cache/clear', (_req: Request, res: Response) => {
 /**
  * POST /api/summarize-document
  * Upload and summarize a document (PDF, DOCX, TXT)
+ * Requires authentication
  */
 router.post(
   '/summarize-document',
+  requireAuth,
   upload.single('file'),
   async (req: Request, res: Response) => {
     const startTime = Date.now();
@@ -403,6 +413,7 @@ router.post(
         markdown: summary,
         fileSize: req.file.size,
         mimeType: req.file.mimetype,
+        userId: req.user?.userId,
       });
 
       // Build result for response
@@ -440,9 +451,11 @@ router.post(
 /**
  * POST /api/analyze-image
  * Upload and analyze an image using multimodal AI
+ * Requires authentication
  */
 router.post(
   '/analyze-image',
+  requireAuth,
   upload.single('file'),
   async (req: Request, res: Response) => {
     const startTime = Date.now();
@@ -502,6 +515,7 @@ router.post(
         markdown: analysisResult.analysis,
         fileSize: req.file.size,
         mimeType: req.file.mimetype,
+        userId: req.user?.userId,
       });
 
       // Build result for response
@@ -535,9 +549,11 @@ router.post(
 /**
  * POST /api/analyze-audio
  * Upload and analyze an audio file using multimodal AI
+ * Requires authentication
  */
 router.post(
   '/analyze-audio',
+  requireAuth,
   upload.single('file'),
   async (req: Request, res: Response) => {
     const startTime = Date.now();
@@ -601,6 +617,7 @@ router.post(
         markdown: analysisResult.analysis,
         fileSize: req.file.size,
         mimeType: req.file.mimetype,
+        userId: req.user?.userId,
       });
 
       // Build result for response

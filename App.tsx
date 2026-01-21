@@ -1,13 +1,15 @@
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { Search, Youtube, Clipboard, FileText, Moon, Sun, History, ChevronRight, X, LayoutDashboard, Upload, Image, FileUp, Globe, Loader2, Mic, FileType } from 'lucide-react';
+import { Search, Youtube, Clipboard, FileText, Moon, Sun, History, ChevronRight, X, LayoutDashboard, Upload, Image, FileUp, Globe, Loader2, Mic, FileType, LogOut, User } from 'lucide-react';
 import { AnalysisStatus, AnalysisState, AnalysisResult } from './types';
 import { apiService, ApiError, summarizeDocument, analyzeImage, analyzeAudio, WORD_COUNT_OPTIONS, WordCountOption, Language as ApiLanguage } from './services/apiService';
 import StatusBadge from './components/StatusBadge';
 import MarkdownRenderer from './components/MarkdownRenderer';
 import { Language, translations } from './locales/translations';
+import { useAuth } from './contexts/AuthContext';
 
 const App: React.FC = () => {
+  const { user, logout } = useAuth();
   const [darkMode, setDarkMode] = useState(false);
   const [language, setLanguage] = useState<Language>('en');
   const [inputValue, setInputValue] = useState('');
@@ -18,6 +20,7 @@ const App: React.FC = () => {
   });
   const [history, setHistory] = useState<AnalysisResult[]>([]);
   const [showHistory, setShowHistory] = useState(false);
+  const [showUserMenu, setShowUserMenu] = useState(false);
 
   // File upload states
   const [documentFile, setDocumentFile] = useState<File | null>(null);
@@ -72,6 +75,11 @@ const App: React.FC = () => {
 
   const toggleLanguage = () => {
     setLanguage(prev => prev === 'en' ? 'zh-TW' : 'en');
+  };
+
+  const handleLogout = async () => {
+    await logout();
+    setShowUserMenu(false);
   };
 
   const handleAnalyze = async (e?: React.FormEvent) => {
@@ -352,6 +360,43 @@ const App: React.FC = () => {
             >
               {darkMode ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
             </button>
+
+            {/* User menu */}
+            <div className="relative">
+              <button
+                onClick={() => setShowUserMenu(!showUserMenu)}
+                className="flex items-center gap-2 px-3 py-1.5 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors"
+              >
+                <User className="w-5 h-5" />
+                <span className="text-sm font-medium max-w-[120px] truncate hidden sm:inline">
+                  {user?.name || user?.email}
+                </span>
+              </button>
+
+              {showUserMenu && (
+                <>
+                  <div
+                    className="fixed inset-0 z-40"
+                    onClick={() => setShowUserMenu(false)}
+                  />
+                  <div className="absolute right-0 top-full mt-2 w-56 bg-white dark:bg-slate-900 rounded-lg shadow-xl border border-slate-200 dark:border-slate-800 z-50 py-2">
+                    <div className="px-4 py-2 border-b border-slate-100 dark:border-slate-800">
+                      <p className="text-sm font-medium text-slate-900 dark:text-white truncate">
+                        {user?.name || (language === 'zh-TW' ? '使用者' : 'User')}
+                      </p>
+                      <p className="text-xs text-slate-500 truncate">{user?.email}</p>
+                    </div>
+                    <button
+                      onClick={handleLogout}
+                      className="w-full px-4 py-2 text-left text-sm text-rose-600 dark:text-rose-400 hover:bg-slate-50 dark:hover:bg-slate-800 flex items-center gap-2"
+                    >
+                      <LogOut className="w-4 h-4" />
+                      {language === 'zh-TW' ? '登出' : 'Sign Out'}
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
           </div>
         </div>
       </header>

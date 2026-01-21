@@ -49,6 +49,7 @@ export interface CreateAnalysisInput {
   markdown: string;
   fileSize?: number;
   mimeType?: string;
+  userId?: string;
 }
 
 export interface AnalysisRecord {
@@ -67,6 +68,7 @@ export interface AnalysisRecord {
   markdown: string;
   fileSize: number | null;
   mimeType: string | null;
+  userId: string | null;
 }
 
 export interface HistoryItem {
@@ -118,6 +120,7 @@ export class DatabaseService {
         markdown: input.markdown,
         fileSize: input.fileSize,
         mimeType: input.mimeType,
+        userId: input.userId,
       },
     });
 
@@ -126,20 +129,34 @@ export class DatabaseService {
 
   /**
    * Get an analysis by ID
+   * If userId is provided, verifies ownership
    */
-  async getAnalysis(id: string): Promise<AnalysisRecord | null> {
+  async getAnalysis(id: string, userId?: string): Promise<AnalysisRecord | null> {
     if (!this.prisma) return null;
-    return this.prisma.analysis.findUnique({
+
+    const analysis = await this.prisma.analysis.findUnique({
       where: { id },
     });
+
+    // If userId provided, verify ownership
+    if (analysis && userId && analysis.userId !== userId) {
+      return null;
+    }
+
+    return analysis;
   }
 
   /**
    * Get analysis history (paginated)
+   * If userId is provided, only returns that user's analyses
    */
-  async getHistory(limit: number = 50, offset: number = 0): Promise<HistoryItem[]> {
+  async getHistory(limit: number = 50, offset: number = 0, userId?: string): Promise<HistoryItem[]> {
     if (!this.prisma) return [];
+
+    const where = userId ? { userId } : {};
+
     const analyses = await this.prisma.analysis.findMany({
+      where,
       select: {
         id: true,
         title: true,
@@ -158,18 +175,35 @@ export class DatabaseService {
 
   /**
    * Get total count of analyses
+   * If userId is provided, only counts that user's analyses
    */
-  async getAnalysisCount(): Promise<number> {
+  async getAnalysisCount(userId?: string): Promise<number> {
     if (!this.prisma) return 0;
-    return this.prisma.analysis.count();
+
+    const where = userId ? { userId } : {};
+    return this.prisma.analysis.count({ where });
   }
 
   /**
    * Delete an analysis by ID
+   * If userId is provided, verifies ownership before deleting
    */
-  async deleteAnalysis(id: string): Promise<boolean> {
+  async deleteAnalysis(id: string, userId?: string): Promise<boolean> {
     if (!this.prisma) return false;
+
     try {
+      // If userId provided, verify ownership first
+      if (userId) {
+        const analysis = await this.prisma.analysis.findUnique({
+          where: { id },
+          select: { userId: true },
+        });
+
+        if (!analysis || analysis.userId !== userId) {
+          return false;
+        }
+      }
+
       await this.prisma.analysis.delete({
         where: { id },
       });

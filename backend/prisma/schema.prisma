@@ -10,11 +10,55 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+// User model for authentication
+model User {
+  id             String   @id @default(cuid())
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  email          String   @unique
+  passwordHash   String
+  name           String?
+  analyses       Analysis[]
+  refreshTokens  RefreshToken[]
+  passwordResets PasswordReset[]
+}
+
+// Refresh tokens for JWT rotation
+model RefreshToken {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+  expiresAt DateTime
+  token     String   @unique
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([token])
+}
+
+// Password reset tokens
+model PasswordReset {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+  expiresAt DateTime
+  token     String   @unique
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  used      Boolean  @default(false)
+
+  @@index([userId])
+  @@index([token])
+}
+
 // Main analysis record
 model Analysis {
   id          String   @id @default(cuid())
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+
+  // User ownership
+  userId      String?
+  user        User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   // Analysis metadata
   title       String
@@ -40,6 +84,7 @@ model Analysis {
   @@index([createdAt(sort: Desc)])
   @@index([inputType])
   @@index([sourceType])
+  @@index([userId])
 }
 
 // Type of input provided by user

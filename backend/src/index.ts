@@ -10,6 +10,7 @@ import rateLimit from 'express-rate-limit';
 
 import { config, validateConfig } from './config.js';
 import apiRouter from './routes/api.js';
+import authRouter from './routes/auth.js';
 import { disconnectDatabase } from './services/databaseService.js';
 
 // Validate configuration on startup
@@ -60,6 +61,9 @@ app.use((req: Request, _res: Response, next: NextFunction) => {
 // ============================================================================
 // Routes
 // ============================================================================
+
+// Auth routes
+app.use('/api/auth', authRouter);
 
 // API routes
 app.use('/api', apiRouter);
