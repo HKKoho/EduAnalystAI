@@ -3,11 +3,8 @@
  * Extracts text content from uploaded documents for educational analysis
  */
 
-import * as pdfParse from 'pdf-parse';
+import pdfParse from 'pdf-parse';
 import mammoth from 'mammoth';
-
-// Get the default export from pdf-parse
-const pdf = (pdfParse as any).default || pdfParse;
 
 export class DocumentServiceError extends Error {
   constructor(message: string) {
@@ -28,7 +25,7 @@ export interface ParsedDocument {
  */
 export async function parsePDF(buffer: Buffer, fileName: string): Promise<ParsedDocument> {
   try {
-    const data = await pdf(buffer);
+    const data = await pdfParse(buffer);
     const text = data.text.trim();
     const wordCount = text.split(/\s+/).filter(Boolean).length;
 
