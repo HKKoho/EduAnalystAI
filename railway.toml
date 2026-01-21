@@ -1,6 +1,6 @@
 [build]
 builder = "nixpacks"
-buildCommand = "cd backend && npm install && npx prisma generate && npm run build"
+buildCommand = "cd backend && rm -rf node_modules && npm cache clean --force && npm install && npx prisma generate && npm run build"
 watchPatterns = ["backend/**"]
 
 [deploy]
