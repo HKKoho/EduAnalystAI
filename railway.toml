@@ -1,10 +1,11 @@
 [build]
 builder = "nixpacks"
 buildCommand = "cd backend && npm install && npx prisma generate && npm run build"
+watchPatterns = ["backend/**"]
 
 [deploy]
 startCommand = "cd backend && npx prisma db push --accept-data-loss && npm start"
-healthcheckPath = "/"
+healthcheckPath = "/api/health"
 healthcheckTimeout = 300
 restartPolicyType = "on_failure"
 
